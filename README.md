@@ -86,7 +86,7 @@ This prints:
 ### 4. Generate one local forecast
 
 ```bash
-python run_forecast_model.py --target_start 2026-03-27T00:00:00+01:00 --challenge_id 1 --save_payload test_payload.json
+python run_forecast_model.py --target_start 2026-11-11T00:00:00+01:00 --challenge_id 1 --save_payload test_payload.json
 ```
 
 If you omit both `--target_start` and `--target_date`, the script uses the selected challenge's
