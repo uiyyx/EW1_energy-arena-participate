@@ -1,8 +1,20 @@
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import subprocess
+import sys
 
 def main(): # find first possible target, initiate clock, check for outstanding submissions
     print("### START of SCRIPT ###")
+
+    # choose path for saving the payloads
+    payloads_path = Path(__file__).parent / "payloads"
+    payloads_path.mkdir(parents=True, exist_ok=True)
+    print(f"Payloads will be saved in: {payloads_path.resolve()}")
+
+    # choose challenge
+    challenge = 2
+    print(f"Challenge {challenge} selected.")
 
     # find first possible target
     first_possible_target = find_first_possible_target()
@@ -32,7 +44,17 @@ def main(): # find first possible target, initiate clock, check for outstanding 
             if payloads_to_compute != {}:
                 print("### START of PAYLOAD COMPUTATION ###")
                 for target, payload_related_data in payloads_to_compute.items():
-                    compute_payload_for_target(now, target, payload_related_data)
+                    #subprocess_1 = compute_payload_for_target(payloads_path,challenge, now, target, payload_related_data)
+
+                    #submit the payload to the Energy Arena
+                    identifyer_payload = payloads_path / f"payload_{target.replace(':', '-').replace(' ', '_')}.json"
+                    subprocess_2= submit_payload_to_energy_arena(identifyer_payload)
+
+                    # update the submitted status for the computed payload
+                    identifyer_target = target.split(" ")[0]
+                    identifyer_Submission = target.split(" ")[1]
+                    upcoming_targets_and_times_for_payload_computation[identifyer_target][f"submitted_{identifyer_Submission}"] = True
+                    print("Submit status updated")
 
 def derive_upcoming_targets_and_times_for_payload_computation(first_possible_target):
     upcoming_targets_and_times_for_payload_computation = {}
@@ -143,7 +165,7 @@ def is_it_time_to_compute_the_next_payload(now, upcoming_targets_and_times_for_p
 
     ## data manipiulation TODO delete later
     #upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["submitted_S2"] = True
-    upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["compute_S1_at"] = now - timedelta(minutes=30)
+    #upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["compute_S1_at"] = now - timedelta(minutes=30)
 
     upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["compute_S2_at"] = now - timedelta(minutes=30)
     ## TODO delete later
@@ -176,16 +198,46 @@ def is_it_time_to_compute_the_next_payload(now, upcoming_targets_and_times_for_p
 
     return payloads_to_compute
 
-def compute_payload_for_target(now, target, payload_related_data):
+def compute_payload_for_target(payloads_path, challenge, now, target, payload_related_data):
     print(f"# Computing payload for {target} at {now.isoformat()} (scheduled at {payload_related_data['compute_at']})")
 
-    # TODO  CONTINUE HEEEEERRRREEEE   
-    # 1. push and pull on prod and let scipt run there 
-    #       -> to see if time-recognition-logik works
-    #        -> but change the time-interval from 5 seconds to semething appropriate
-    # 2.implement payload computation trigger/logic here
+    iso_target = datetime(2026, 11, 29, 0, 0, tzinfo=timezone(timedelta(hours=1)))
+    iso_target = iso_target.isoformat(timespec='seconds')
+    
+    # iso time of the target for which the payload is computed
+    iso_target = (payload_related_data['compute_at'] + timedelta(minutes=30)).isoformat(timespec='seconds')
 
+    
+    # path to save the payload
+    payloads_path = Path(payloads_path) / f"payload_{target.replace(':', '-').replace(' ', '_')}.json"
+    payloads_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [sys.executable, "run_forecast_model.py",
+            "--target_start", iso_target,
+            "--challenge_id", str(challenge),
+            "--save_payload", str(payloads_path)]
+
+    # TODO  CONTINUE HEEEEERRRREEEE   
+    # 1.implement payload computation trigger/logic here
+
+    x = subprocess.run(cmd, check=True, text=True, capture_output=True) # test computation via the base model of the forked repository
     print(f"Payload for {target} computed and saved successfully.")
+    return x #test computation via the base model of the forked repository
+
+def submit_payload_to_energy_arena(payload):
+    print("\n### Payload Submission ###")
+    print(f"payload to be submitted: {payload.name}")
+
+    payload_path = Path(str(payload))
+    payload_path = Path(*payload_path.parts[payload_path.parts.index("payloads"):])
+    str_payload_path = str(payload_path)
+
+    cmd = [sys.executable, "submit_forecast_to_energy_arena.py",
+           "--payload_path", str_payload_path]
+
+    x = subprocess.run(cmd, check=True, text=True, capture_output=True)
+    print(f"Payload for {payload.name} submitted successfully")
+    return x
 
 if __name__ == "__main__":
     main()
