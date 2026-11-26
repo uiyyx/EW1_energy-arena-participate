@@ -30,31 +30,45 @@ def main(): # find first possible target, initiate clock, check for outstanding 
     x=1
 
     # initiate clock
-    print("### START of CLOCK ###")
+    print("\n### START of CLOCK ###")
     while True:
         now = datetime.now(timezone(timedelta(hours=1)))
-        print(f"Script is running. Current UTC time: {now.isoformat()}")
-        time.sleep(1)  # sleep for 1 seconds before printing the time again
-
+        print(f"Script is running. Current time: {now.isoformat()}")
+        
         # check if it is time_to_compute_the_next_payload
-        if now.second % 5 == 0: #TODO change later to 30mins or whatever is appropriate
+        if now.minute % 15 == 0: 
             payloads_to_compute = is_it_time_to_compute_the_next_payload(now, upcoming_targets_and_times_for_payload_computation)
+            show_submission_statuses(upcoming_targets_and_times_for_payload_computation)
 
             # initiate payload computation if there are payloads that must be submitted soon
             if payloads_to_compute != {}:
-                print("### START of PAYLOAD COMPUTATION ###")
+                print("\n### START of PAYLOAD COMPUTATION ###")
                 for target, payload_related_data in payloads_to_compute.items():
-                    #subprocess_1 = compute_payload_for_target(payloads_path,challenge, now, target, payload_related_data)
-
+                    
+                    """TODO enable later
+                    subprocess_1 = compute_payload_for_target(payloads_path,challenge, now, target, payload_related_data)
+                    """
+                    print("Computed") # TODO delete later, just for feedback while testing
                     #submit the payload to the Energy Arena
                     identifyer_payload = payloads_path / f"payload_{target.replace(':', '-').replace(' ', '_')}.json"
+                    """TODO enable later
                     subprocess_2= submit_payload_to_energy_arena(identifyer_payload)
+                    """
+                    print("Submitted") # TODO delete later, just for feedback while testing
 
                     # update the submitted status for the computed payload
                     identifyer_target = target.split(" ")[0]
                     identifyer_Submission = target.split(" ")[1]
                     upcoming_targets_and_times_for_payload_computation[identifyer_target][f"submitted_{identifyer_Submission}"] = True
-                    print("Submit status updated")
+                    show_submission_statuses(upcoming_targets_and_times_for_payload_computation)
+
+        # sleep until the next 5 minute time slot starts
+        tz = timezone(timedelta(hours=1))
+        now_sleep = datetime.now(tz)
+        minutes_until_next = 5 - (now_sleep.minute % 5)
+        next_5min = (now_sleep + timedelta(minutes=minutes_until_next)).replace(second=0, microsecond=100_000)
+        time.sleep(max(0.0, (next_5min - datetime.now(tz)).total_seconds()))         
+
 
 def derive_upcoming_targets_and_times_for_payload_computation(first_possible_target):
     upcoming_targets_and_times_for_payload_computation = {}
@@ -163,12 +177,12 @@ def is_it_time_to_compute_the_next_payload(now, upcoming_targets_and_times_for_p
     # initiate local variables
     decision = False # might be updated to True
 
-    ## data manipiulation TODO delete later
+    """ data manipiulation TODO delete later
     #upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["submitted_S2"] = True
     #upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["compute_S1_at"] = now - timedelta(minutes=30)
 
     upcoming_targets_and_times_for_payload_computation["Target_2__2026-11-30"]["compute_S2_at"] = now - timedelta(minutes=30)
-    ## TODO delete later
+    TODO delete later """
 
     # check if it is time to compute payloads
     payloads_to_compute = {}
@@ -201,13 +215,14 @@ def is_it_time_to_compute_the_next_payload(now, upcoming_targets_and_times_for_p
 def compute_payload_for_target(payloads_path, challenge, now, target, payload_related_data):
     print(f"# Computing payload for {target} at {now.isoformat()} (scheduled at {payload_related_data['compute_at']})")
 
+    """ TODO delete later
     iso_target = datetime(2026, 11, 29, 0, 0, tzinfo=timezone(timedelta(hours=1)))
     iso_target = iso_target.isoformat(timespec='seconds')
+    """
     
     # iso time of the target for which the payload is computed
     iso_target = (payload_related_data['compute_at'] + timedelta(minutes=30)).isoformat(timespec='seconds')
 
-    
     # path to save the payload
     payloads_path = Path(payloads_path) / f"payload_{target.replace(':', '-').replace(' ', '_')}.json"
     payloads_path.parent.mkdir(parents=True, exist_ok=True)
@@ -238,6 +253,17 @@ def submit_payload_to_energy_arena(payload):
     x = subprocess.run(cmd, check=True, text=True, capture_output=True)
     print(f"Payload for {payload.name} submitted successfully")
     return x
+
+def show_submission_statuses(upcoming_targets_and_times_for_payload_computation):
+    print("\n### Submitted Targets ###")
+    for target, payload_related_info in upcoming_targets_and_times_for_payload_computation.items():
+        if any(payload_related_info[f"submitted_S{s}"] for s in range(1, 9)):
+                            statuses = ", ".join(
+                                f"S{s}={payload_related_info[f'submitted_S{s}']}"
+                                for s in range(1, 9)
+                            )
+                            print(f"  {target}: {statuses}")
+    print("\n")
 
 if __name__ == "__main__":
     main()
